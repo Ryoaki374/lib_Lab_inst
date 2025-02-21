@@ -90,3 +90,51 @@ def DataAcquisition(tp, save_path, filename, columnname, sampling_rate=512):
                 # Write the header line then the data block
                 print(*columnname, sep=", ", file=f)
                 np.savetxt(f, arr.T, delimiter=",")
+
+
+def SingleDataAcquisition(timedata, save_path, filename, columnname, sampling_rate=512):
+    """
+    Acquires one block of data from the NI-DAQ and writes it to a CSV file.
+
+    Parameters:
+        tp (generator): A time provider generator yielding time values.
+        save_path (str): Directory where the CSV file will be saved.
+        filename (str): Initial file path for saving data.
+        columnname (list): List of column names for the CSV header.
+        sampling_rate (int): Number of samples to acquire per second.
+    """
+    try:
+        with nidaqmx.Task() as task:
+            # Add analog input channels for current and voltage measurements
+            task.ai_channels.add_ai_voltage_chan("cDAQ1Mod2/ai0")  # Current Phase A
+            task.ai_channels.add_ai_voltage_chan("cDAQ1Mod2/ai1")  # Current Phase B
+            task.ai_channels.add_ai_voltage_chan("cDAQ1Mod1/ai0")  # Voltage Phase A
+            task.ai_channels.add_ai_voltage_chan("cDAQ1Mod1/ai2")  # Voltage Phase B
+
+            # Configure the sampling clock for continuous acquisition
+            task.timing.cfg_samp_clk_timing(
+                rate=sampling_rate,
+                sample_mode=AcquisitionType.CONTINUOUS,
+                samps_per_chan=int(sampling_rate),
+            )
+            # Read a block of data (number of samples per channel equals sampling_rate)
+            data = np.array(task.read(number_of_samples_per_channel=sampling_rate))
+    except nidaqmx.errors.DaqError as e:
+        print(f"Reading Error: {e}")
+        return
+
+    # Generate a time vector for the current block by collecting sampling_rate time points from tp
+    # timedata = np.array(list(islice(tp, sampling_rate)))
+    # Stack the time data and the acquired data vertically (each row corresponds to a channel)
+    arr = np.vstack([timedata, data])
+    try:
+        with open(filename, mode="a") as f:
+            np.savetxt(f, arr.T, delimiter=",")
+    except FileNotFoundError:
+        print("FileNotFoundError occurred... Creating a new file.")
+        # If the file is not found, create a new file with a timestamp in the filename
+        filename = save_path + dt.datetime.now().strftime("%Y%m%d%H%M%S") + ".csv"
+        with open(filename, mode="a") as f:
+            # Write the header line then the data block
+            print(*columnname, sep=", ", file=f)
+            np.savetxt(f, arr.T, delimiter=",")

@@ -146,3 +146,40 @@ def DataAcquisition(tp, filename, save_path, column_names, instrument):
                 # Write the CSV header and then the current data point
                 print(*column_names, sep=", ", file=file)
                 print(*data_point, sep=", ", file=file)
+
+
+def SingleDataAcquisition(tp, filename, save_path, column_names, instrument):
+    """
+    Acquires one data point by recording the current relative time and voltage from the instrument,
+    and writes the data point to a CSV file.
+
+    Parameters:
+        tp (generator): A time provider generator yielding relative time values.
+        filename (str): The path to the CSV file where data will be saved.
+        save_path (str): The directory path used to create a new file if the current file is not found.
+        column_names (list): List of column names for the CSV header.
+        instrument: The instrument object (e.g., KT2700[0]) that supports the getVoltage() method.
+    """
+    # Retrieve the current relative time from the time provider
+    current_relative_time = next(tp)
+    # Build the data point starting with the relative time
+    data_point = [current_relative_time]
+    # Retrieve the voltage measurement using the instrument's getVoltage method
+    voltage_value = getVoltage(instrument)
+    data_point.append(voltage_value)
+
+    # Optionally, print the data point for debugging
+    # print(data_point)
+
+    # Try to append the data point to the CSV file
+    try:
+        with open(filename, mode="a") as file:
+            print(*data_point, sep=", ", file=file)
+    except FileNotFoundError:
+        print("FileNotFoundError occurred. Creating a new file...")
+        # Create a new filename based on the current timestamp
+        filename = save_path + dt.datetime.now().strftime("%Y%m%d%H%M%S") + ".csv"
+        with open(filename, mode="a") as file:
+            # Write the CSV header and then the current data point
+            print(*column_names, sep=", ", file=file)
+            print(*data_point, sep=", ", file=file)
