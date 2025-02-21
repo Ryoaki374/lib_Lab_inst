@@ -104,59 +104,45 @@ def getVoltage(self):
     return voltage
 
 
-def DataAcquisition(filename, save_path, column_names, refresh_rate, instrument):
+def DataAcquisition(tp, filename, save_path, column_names, instrument):
     """
     Continuously records voltage data from the given instrument and appends it to a CSV file.
+
     Parameters:
+        tp (generator): A time provider generator yielding relative time values.
         filename (str): The path to the CSV file where data will be saved.
         save_path (str): The directory path used to create a new file if the current file is not found.
         column_names (list): List of column names for the CSV header.
-        refresh_rate (float): The delay (in seconds) between each data acquisition.
+        sampling_rate (float): The number of samples per second.
         instrument: The instrument object (e.g., KT2700[0]) that supports the getVoltage() method.
-    The function performs the following steps:
-      1. Records the start time.
-      2. In an infinite loop:
-         - Calculates the relative time from the start.
-         - Retrieves the voltage measurement from the instrument.
-         - Prints the data to the console.
-         - Waits for the specified refresh rate.
-         - Attempts to append the data (relative time and voltage) to the CSV file.
-         - If the file is not found, it creates a new file with a header and writes the data.
+
+    The function performs the following steps in an infinite loop:
+      1. Retrieves the current relative time from the time provider.
+      2. Retrieves the voltage measurement from the instrument.
+      3. Attempts to append the data (relative time and voltage) to the CSV file.
+         If the file is not found, it creates a new file with a header and writes the data.
     """
-    start_time = time.perf_counter()  # Record the start time
     while True:
-        # Calculate the current relative time from the start
-        current_relative_time = time.perf_counter() - start_time
-        # Create a data list starting with the relative time
+        # Get the current relative time from the time provider
+        current_relative_time = next(tp)
+        # Build the data point starting with the relative time
         data_point = [current_relative_time]
         # Retrieve the voltage measurement using the instrument's getVoltage method
         voltage_value = getVoltage(instrument)
         data_point.append(voltage_value)
-        # Print the data point to the console for debugging purposes
+
+        # Optionally, print the data point for debugging
         # print(data_point)
-        # Wait for the specified refresh rate before taking the next measurement
-        time.sleep(refresh_rate)
+
         # Try to append the data point to the CSV file
         try:
             with open(filename, mode="a") as file:
                 print(*data_point, sep=", ", file=file)
         except FileNotFoundError:
-            # If the file is not found, create a new file with a header
             print("FileNotFoundError occurred. Creating a new file...")
+            # Create a new filename based on the current timestamp
             filename = save_path + dt.datetime.now().strftime("%Y%m%d%H%M%S") + ".csv"
             with open(filename, mode="a") as file:
-                # Write the CSV header
+                # Write the CSV header and then the current data point
                 print(*column_names, sep=", ", file=file)
-                # Write the current data point
                 print(*data_point, sep=", ", file=file)
-
-
-# Example usage:
-# Assume that KT2700 is a list where the first element is the instrument object
-# and that getVoltage() is already defined.
-#
-# filename = r"C:/Users/IPMU/Desktop/2025-gripper-run3/MULTIMETER/20250221123456_MULTIMETER_KT2700.csv"
-# column_names = ['reltime', 'Voltage[V]']
-# refresh_rate = 0.1  # in seconds
-#
-# record_voltage_data(filename, r"C:/Users/IPMU/Desktop/2025-gripper-run3/MULTIMETER/", column_names, refresh_rate, KT2700[0])
